@@ -2,13 +2,14 @@
 
 ;; Author: komem3 <komata392@gmail.com>
 ;; URL: https://github.com/komem3/go-alarm
-;; Version:
 ;; Keywords: languages, go
 
-;; This program is free software; you can redistribute it and/or
-;; modify it under the terms of the GNU General Public License
-;; as published by the Free Software Foundation; either version 2
-;; of the License, or (at your option) any later version.
+;; Copyright (C) 2020 komem3
+
+;; This program is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
 
 ;; This program is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -16,9 +17,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program; if not, write to the Free Software
-;; Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-;; 02110-1301, USA.
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -63,18 +62,17 @@
   "Get latest process status."
   (if (not goalarm-process-response)
       ""
-    (cdr (assoc 'status
-              (json-read-from-string goalarm-process-response)))))
+    (cdr (assoc 'status goalarm-process-response))))
 
 (defun goalarm-update-status (process output)
   "Update goalarm status.
 PROCESS and OUTPUT is jnjected from 'goalarm-process'."
-  (setq goalarm-process-response output)
+  (setq goalarm-process-response (json-read-from-string output))
   (let ((status (goalarm-process-status)))
     (cond ((string= status "stop") (progn (run-hooks 'goalarm-stop-hook) (message "goalarm stopped.")))
           ((string= status "finish") (progn (run-hooks 'goalarm-finish-hook) (message "goalarm finished.")))
           ((string= status "error") (message (cdr (assoc 'error
-                                                         (json-read-from-string goalarm-process-response))))))))
+                                                         goalarm-process-response)))))))
 
 (defun goalarm-check-process-running()
   "Check status of process."
@@ -91,41 +89,57 @@ PROCESS and OUTPUT is jnjected from 'goalarm-process'."
   (let ((status (goalarm-process-status)))
     (if (or (string= status "running") (string= status "pause"))
         (cdr (assoc 'left
-                    (json-read-from-string goalarm-process-response))))))
+                    goalarm-process-response)))))
 
 (defun goalarm-sentinel (process event)
   "Event handler.  PROCESS and EVENT is inject from 'goalarm-process'."
   (if (not (goalarm-check-process-running))
       (progn
         (run-hooks 'goalarm-exit-hook)
-        (setq goalarm-process nil))))
+        (setq goalarm-process nil)
+        (setq goalarm-process-response nil))))
+
+(defun goalarm-convert-args-min-or-time (args)
+  "Determine which time format.  ARGS are 'min' or 'hh:min:sec' or 'minl'."
+  (cond ((string-match "^\\([[:digit:]]+\\)\\W*$" args)
+         (list "-min" (match-string 1 args)))
+        ((string-match "^\\([[:digit:]]+:[[:digit:]]+:[[:digit:]]+\\)\\W*$" args)
+         (list "-time" (match-string 1 args)))
+        ((string-match "^\\([[:digit:]]+\\)l\\W*$" args)
+         (list "-loop" "-min" (match-string 1 args)))
+        ((string-match "^\\([[:digit:]]+:[[:digit:]]+:[[:digit:]]+\\)l\\W*$" args)
+         (list "-loop" "-time" (match-string 1 args)))))
 
 ;;;###autoload
 (defun goalarm-start (args)
-  "Start goalarm.  ARGS are time of alarm."
-  (interactive "sargs of goalarm command(min or hh:min:sec): ")
+  "Start goalarm.  ARGS are time of alarm.
+When you want to loop, write 'l' at the args end."
+  (interactive "sargs of goalarm command. (min or hh:min:sec or minl): ")
   (cond
-   ((not goalarm-sound-file) (message "yet not setting goalarm-sound-file."))
+   ((not goalarm-sound-file) ((message "yet not setting goalarm-sound-file.")))
    ((goalarm-check-process-running) (message "already goalarm running"))
    ((string-empty-p args) (message "args is empty"))
    (t (progn
-        (run-hooks 'goalarm-start-hook)
-        (setq goalarm-process
-              (make-process :name "goalarm"
-                            :buffer "*goalarm*"
-                            :stderr "*goalarm::stderr*"
-                            :command (list "goalarm"
-                                      "-file"
-                                      (shell-quote-argument goalarm-sound-file)
-                                      "-min"
-                                      (shell-quote-argument args))
-                            :connection-type 'pipe
-                            :sentinel 'goalarm-sentinel
-                            :filter 'goalarm-update-status
-                            :noquery t))
-        (setq goalarm-process-response nil)
-        (goalarm-send-get-signal)       ; first signal
-        (message "start goalarm.")))))
+        (let ((time-args (goalarm-convert-args-min-or-time args)))
+          (if (not time-args)
+              (message "args are invalid format.  (min or hh:min:sec or minl)")
+            (run-hooks 'goalarm-start-hook)
+            (setq goalarm-process
+                  (make-process :name "goalarm"
+                                :buffer "*goalarm*"
+                                :stderr "*goalarm::stderr*"
+                                :command (flatten-tree
+                                          `("goalarm"
+                                           "-file"
+                                           ,(shell-quote-argument goalarm-sound-file)
+                                           ,time-args))
+                                :connection-type 'pipe
+                                :sentinel 'goalarm-sentinel
+                                :filter 'goalarm-update-status
+                                :noquery t))
+            (setq goalarm-process-response nil)
+            (goalarm-send-get-signal)       ; first signal
+            (message "start goalarm.")))))))
 
 ;;;###autoload
 (defun goalarm-stop ()
