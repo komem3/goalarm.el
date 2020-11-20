@@ -116,9 +116,9 @@ PROCESS and OUTPUT is jnjected from 'goalarm-process'."
 When you want to loop, write 'l' at the args end."
   (interactive "sargs of goalarm command. (min or hh:min:sec or minl): ")
   (cond
-   ((not goalarm-sound-file) ((message "yet not setting goalarm-sound-file.")))
-   ((goalarm-check-process-running) (message "already goalarm running"))
-   ((string-empty-p args) (message "args is empty"))
+   ((not goalarm-sound-file) (message "yet not setting goalarm-sound-file."))
+   ((goalarm-check-process-running) (message "already goalarm running."))
+   ((string-empty-p args) (message "args is empty."))
    (t (progn
         (let ((time-args (goalarm-convert-args-min-or-time args)))
           (if (not time-args)
