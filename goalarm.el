@@ -1,10 +1,11 @@
-;; goalarm.el --- manage the goalarm process
-
-;; Author: komem3 <komata392@gmail.com>
-;; URL: https://github.com/komem3/go-alarm
-;; Keywords: languages, go
+;;; goalarm.el --- manage the goalarm process
 
 ;; Copyright (C) 2020 komem3
+
+;; Author: komem3 <komata392@gmail.com>
+;; Keywords: languages, go
+;; URL: https://github.com/komem3/go-alarm
+;; Version: 1.0
 
 ;; This program is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -33,9 +34,26 @@
 (defvar goalarm-process-response nil
   "Status of goalarm response.")
 
+(defcustom goalarm-read-routine-function 'goalarm-default-read-routine
+  "Function of reading routine from minibuffer."
+  :type 'function
+  :group 'goalarm)
+
 (defcustom goalarm-sound-file nil
   "Sound file of alarm.  File is allowed mp3."
   :type 'string
+  :group 'goalarm)
+
+(defcustom goalarm-routine-list '(("pomodro" . (:value
+                                                (((name . "working1") (range . 25))
+                                                 ((name . "break") (range . 5))
+                                                 ((name . "working2") (range . 25))
+                                                 ((name . "break") (range . 5))
+                                                 ((name . "working3") (range . 25))
+                                                 ((name . "break") (range . 15)))
+                                                :loop t)))
+  "List of routine."
+  :type 'alist
   :group 'goalarm)
 
 (defcustom goalarm-start-hook nil
@@ -58,11 +76,10 @@
   :type 'hook
   :group 'goalarm)
 
-(defun goalarm-process-status()
-  "Get latest process status."
-  (if (not goalarm-process-response)
-      ""
-    (cdr (assoc 'status goalarm-process-response))))
+(defun goalarm-default-read-routine (routine-list)
+  "Reading routine from minibuffer.  ROUTINE-LIST is list of routine."
+  (let ((keys (mapcar 'car routine-list)))
+    (read-string "Which routine does start? " (car keys))))
 
 (defun goalarm-update-status (process output)
   "Update goalarm status.
@@ -83,14 +100,6 @@ PROCESS and OUTPUT is jnjected from 'goalarm-process'."
   (if (goalarm-check-process-running)
       (process-send-string goalarm-process "get\n")))
 
-(defun goalarm-get-time()
-  "Get time."
-  (goalarm-send-get-signal)
-  (let ((status (goalarm-process-status)))
-    (if (or (string= status "running") (string= status "pause"))
-        (cdr (assoc 'left
-                    goalarm-process-response)))))
-
 (defun goalarm-sentinel (process event)
   "Event handler.  PROCESS and EVENT is inject from 'goalarm-process'."
   (if (not (goalarm-check-process-running))
@@ -110,36 +119,86 @@ PROCESS and OUTPUT is jnjected from 'goalarm-process'."
         ((string-match "^\\([[:digit:]]+:[[:digit:]]+:[[:digit:]]+\\)l\\W*$" args)
          (list "-loop" "-time" (match-string 1 args)))))
 
+(defun goalarm-convert-routine-args (routine)
+  "Convert routine to json args.  ROUTINE are one of the 'goalarm-routine-list'."
+  (let ((value (json-encode-list (plist-get routine :value)))
+        (loop (plist-get routine :loop)))
+    (if loop
+        (list "-routine" value "-loop")
+      (list "-routine" value))))
+
+(defun goalarm-start-process (args start-message)
+  "Start goalarm process.  ARGS are goalarm args.  START-MESSAGE is message of starting message."
+  (cond
+   ((not goalarm-sound-file) (message "yet not setting goalarm-sound-file."))
+   ((goalarm-check-process-running) (message "already goalarm running."))
+   (t (progn
+        (run-hooks 'goalarm-start-hook)
+        (setq goalarm-process
+              (make-process :name "goalarm"
+                            :buffer "*goalarm*"
+                            :stderr "*goalarm::stderr*"
+                            :command (flatten-tree
+                                      `("goalarm"
+                                        "-file"
+                                        ,(shell-quote-argument goalarm-sound-file)
+                                        ,args))
+                            :connection-type 'pipe
+                            :sentinel 'goalarm-sentinel
+                            :filter 'goalarm-update-status
+                            :noquery t))
+        (setq goalarm-process-response nil)
+        (goalarm-send-get-signal)       ; first signal
+        (message start-message)))))
+
+;;
+;; use modeline functions
+;;
+
+(defun goalarm-get-time()
+  "Get time."
+  (goalarm-send-get-signal)
+  (let ((status (goalarm-process-status)))
+    (if (or (string= status "running") (string= status "pause"))
+        (cdr (assoc 'left
+                    goalarm-process-response)))))
+
+(defun goalarm-process-status()
+  "Get latest process status."
+  (if (not goalarm-process-response)
+      ""
+    (cdr (assoc 'status goalarm-process-response))))
+
+(defun goalarm-get-alarm-name()
+  "Get running alarm name."
+  (let ((status (goalarm-process-status)))
+    (if (or (string= status "running") (string= status "pause"))
+        (cdr (assoc 'name (cdr (assoc 'task
+                    goalarm-process-response)))))))
+
 ;;;###autoload
 (defun goalarm-start (args)
   "Start goalarm.  ARGS are time of alarm.
 When you want to loop, write 'l' at the args end."
   (interactive "sargs of goalarm command. (min or hh:min:sec or minl): ")
-  (cond
-   ((not goalarm-sound-file) (message "yet not setting goalarm-sound-file."))
-   ((goalarm-check-process-running) (message "already goalarm running."))
-   ((string-empty-p args) (message "args is empty."))
-   (t (progn
-        (let ((time-args (goalarm-convert-args-min-or-time args)))
-          (if (not time-args)
-              (message "args are invalid format.  (min or hh:min:sec or minl)")
-            (run-hooks 'goalarm-start-hook)
-            (setq goalarm-process
-                  (make-process :name "goalarm"
-                                :buffer "*goalarm*"
-                                :stderr "*goalarm::stderr*"
-                                :command (flatten-tree
-                                          `("goalarm"
-                                           "-file"
-                                           ,(shell-quote-argument goalarm-sound-file)
-                                           ,time-args))
-                                :connection-type 'pipe
-                                :sentinel 'goalarm-sentinel
-                                :filter 'goalarm-update-status
-                                :noquery t))
-            (setq goalarm-process-response nil)
-            (goalarm-send-get-signal)       ; first signal
-            (message "start goalarm.")))))))
+  (if (string-empty-p args) (message "args is empty.")
+    (let ((time-args (goalarm-convert-args-min-or-time args)))
+      (if time-args
+          (goalarm-start-process time-args "start goalarm.")
+        (message "args are invalid format.  (min or hh:min:sec or minl)")))))
+
+;;;###autoload
+(defun goalarm-routine ()
+    "Start goalarm routine.
+Read a routine of 'goalarm-routine-list' from minibuffer and execute it.
+Read function is 'goalarm-read-routine-function'"
+    (interactive)
+    (let* ((key (funcall goalarm-read-routine-function goalarm-routine-list))
+           (routine (assoc key goalarm-routine-list))
+           (routine-args (goalarm-convert-routine-args (cdr routine))))
+      (if routine-args
+          (goalarm-start-process routine-args (format "start %s." (car routine)))
+        (message "no such routine."))))
 
 ;;;###autoload
 (defun goalarm-stop ()

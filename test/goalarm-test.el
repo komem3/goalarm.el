@@ -19,7 +19,19 @@
 
 ;;; Code:
 
-(load-file "./goalarm.elc")
+(require 'goalarm)
+(require 'el-mock)
+
+(ert-deftest goalarm-default-read-routine-test ()
+  (let ((routines '(("pomodro" . (:value (((name . "working1") (range . 25)))
+                                       :loop t))
+                   ("break" . (:value (((name . "break") (range . 5)))
+                                     :loop nil)))))
+  (with-mock
+    (stub read-string => "pomodro")
+    (should (equal (goalarm-default-read-routine routines) "pomodro"))
+    (stub read-string => "break")
+    (should (equal (goalarm-default-read-routine routines) "break")))))
 
 (ert-deftest goalarm-convert-args-min-or-time-test ()
   (should (not (goalarm-convert-args-min-or-time "tt")))
@@ -39,6 +51,14 @@
                  '("-loop" "-time" "33:33:33")))
   (should (equal (goalarm-convert-args-min-or-time "33:33:33l ")
                  '("-loop" "-time" "33:33:33"))))
+
+(ert-deftest goalarm-convert-routine-args-test ()
+  (should (equal (goalarm-convert-routine-args
+           '(:value (((name . "working1") (range . 25))) :loop t))
+                 (list "-routine" "[{\"name\":\"working1\",\"range\":25}]" "-loop")))
+  (should (equal (goalarm-convert-routine-args
+           '(:value (((name . "break") (range . 5))) :loop nil))
+          (list "-routine" "[{\"name\":\"break\",\"range\":5}]"))))
 
 (ert-deftest goalarm-start-test()
   (setq-local goalarm-sound-file nil)
