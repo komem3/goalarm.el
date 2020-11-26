@@ -40,7 +40,7 @@
   :group 'goalarm)
 
 (defcustom goalarm-sound-file nil
-  "Sound file of alarm.  File is allowed mp3."
+  "Sound file of alarm.  File is allowed mp3 or wav."
   :type 'string
   :group 'goalarm)
 
@@ -83,7 +83,7 @@
 
 (defun goalarm-update-status (process output)
   "Update goalarm status.
-PROCESS and OUTPUT is jnjected from 'goalarm-process'."
+PROCESS and OUTPUT is jnjected from `goalarm-process'."
   (setq goalarm-process-response (json-read-from-string output))
   (let ((status (goalarm-process-status)))
     (cond ((string= status "stop") (progn (run-hooks 'goalarm-stop-hook) (message "goalarm stopped.")))
@@ -101,7 +101,7 @@ PROCESS and OUTPUT is jnjected from 'goalarm-process'."
       (process-send-string goalarm-process "get\n")))
 
 (defun goalarm-sentinel (process event)
-  "Event handler.  PROCESS and EVENT is inject from 'goalarm-process'."
+  "Event handler.  PROCESS and EVENT is inject from `goalarm-process'."
   (if (not (goalarm-check-process-running))
       (progn
         (run-hooks 'goalarm-exit-hook)
@@ -109,7 +109,7 @@ PROCESS and OUTPUT is jnjected from 'goalarm-process'."
         (setq goalarm-process-response nil))))
 
 (defun goalarm-convert-args-min-or-time (args)
-  "Determine which time format.  ARGS are 'min' or 'hh:min:sec' or 'minl'."
+  "Determine which time format.  ARGS are `min' or `hh:min:sec' or `minl'."
   (cond ((string-match "^\\([[:digit:]]+\\)\\W*$" args)
          (list "-min" (match-string 1 args)))
         ((string-match "^\\([[:digit:]]+:[[:digit:]]+:[[:digit:]]+\\)\\W*$" args)
@@ -120,7 +120,7 @@ PROCESS and OUTPUT is jnjected from 'goalarm-process'."
          (list "-loop" "-time" (match-string 1 args)))))
 
 (defun goalarm-convert-routine-args (routine)
-  "Convert routine to json args.  ROUTINE are one of the 'goalarm-routine-list'."
+  "Convert routine to json args.  ROUTINE are one of the `goalarm-routine-list'."
   (let ((value (json-encode-list (plist-get routine :value)))
         (loop (plist-get routine :loop)))
     (if loop
@@ -156,7 +156,7 @@ PROCESS and OUTPUT is jnjected from 'goalarm-process'."
 ;;
 
 (defun goalarm-get-time()
-  "Get time."
+  "Get time from goalarm process."
   (goalarm-send-get-signal)
   (let ((status (goalarm-process-status)))
     (if (or (string= status "running") (string= status "pause"))
@@ -164,7 +164,8 @@ PROCESS and OUTPUT is jnjected from 'goalarm-process'."
                     goalarm-process-response)))))
 
 (defun goalarm-process-status()
-  "Get latest process status."
+  "Get latest goalarm status.
+Status is `running', `pause' or empty string."
   (if (not goalarm-process-response)
       ""
     (cdr (assoc 'status goalarm-process-response))))
@@ -190,8 +191,8 @@ When you want to loop, write 'l' at the args end."
 ;;;###autoload
 (defun goalarm-routine ()
     "Start goalarm routine.
-Read a routine of 'goalarm-routine-list' from minibuffer and execute it.
-Read function is 'goalarm-read-routine-function'"
+Read a routine of `goalarm-routine-list' from minibuffer and execute it.
+Read function is `goalarm-read-routine-function'."
     (interactive)
     (let* ((key (funcall goalarm-read-routine-function goalarm-routine-list))
            (routine (assoc key goalarm-routine-list))
