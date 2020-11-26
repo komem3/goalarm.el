@@ -209,22 +209,17 @@ Read function is 'goalarm-read-routine-function'"
     (message "already stop.")))
 
 ;;;###autoload
-(defun goalarm-resume ()
-  "Resume goalarm."
+(defun goalarm-pause-or-resume ()
+  "Pause or resume goalarm."
   (interactive)
-  (if (goalarm-check-process-running)
-      (process-send-string goalarm-process "start\n")
-    (message "not running goalarm.")))
-
-;;;###autoload
-(defun goalarm-pause ()
-  "Pause goalarm."
-  (interactive)
-  (if (goalarm-check-process-running)
-      (progn
-        (process-send-string goalarm-process "pause\n")
-        (message "pause goalarm."))
-    (message "not running goalarm.")))
+  (pcase (goalarm-process-status)
+    ("running"
+     (process-send-string goalarm-process "pause\n")
+     (message "pause goalarm."))
+    ("pause"
+     (process-send-string goalarm-process "start\n")
+     (message "resume goalarm."))
+    (_ (message "not running goalarm."))))
 
 ;;;###autoload
 (defun goalarm-restart ()

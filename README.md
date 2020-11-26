@@ -17,11 +17,10 @@ Read a routine of 'goalarm-routine-list' from minibuffer and execute it.
 Read function is 'goalarm-read-routine-function'
 - goalarm-stop:
   Resume goalarm.
-- goalarm-pause:
-  Pause goalarm.
+- goalarm-pause-or-resume:
+  Pause or resume goalarm.
 - goalarm-restart:
   Restart goalarm.
-
 
 ## Settings
 
