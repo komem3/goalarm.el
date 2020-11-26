@@ -47,7 +47,7 @@ Read function is `goalarm-read-routine-function`.
 - goalarm-restart:
   Restart goalarm.
 
-### Util Functions
+### Convenient functions
 - goalarm-get-time:
   Get time from goalarm process.
 - goalarm-process-status:
