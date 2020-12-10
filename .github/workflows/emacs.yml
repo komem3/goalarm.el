@@ -5,7 +5,7 @@ on: push
 jobs:
   test:
     name: test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: purcell/setup-emacs@master
         with:
@@ -15,4 +15,4 @@ jobs:
         run: sudo apt-get install libasound2-dev
 
       - name: Test
-        run: make test
+        run: cask exec ert-runner
