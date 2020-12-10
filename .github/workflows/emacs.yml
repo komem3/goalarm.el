@@ -1,0 +1,18 @@
+name: Emacs
+
+on: push
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: purcell/setup-emacs@master
+        with:
+          version: 27.1
+
+      - name: Install Dependency
+        run: sudo apt-get install libasound2-dev
+
+      - name: Test
+        run: make test
