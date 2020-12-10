@@ -2,6 +2,7 @@ help:           ## Show this help.
 	@fgrep -h "##" $(MAKEFILE_LIST) | fgrep -v fgrep | sed -e 's/\\$$//' | sed -e 's/##//'
 
 init: ## Init Cask.
+	go get github.com/komem3/goalarm/cmd/goalarm && \
 	cask install
 
 build: ## Build lisp files.
